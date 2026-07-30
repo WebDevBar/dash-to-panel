@@ -3,6 +3,22 @@
 Why this fork exists, what it carries, and what is planned. Not upstream documentation.
 Started 2026-07-30 on Fedora 44 / GNOME Shell 50.0 (Wayland).
 
+## Branches - build from `webdevbar-local`, NOT from a feature branch
+
+| Branch | Purpose |
+|---|---|
+| **`webdevbar-local`** | **what we RUN.** master + every feature/fix merged. Always `make install-local` from here |
+| `master` | upstream master + #2493 + our hoist + #2509 |
+| `feat/status-group-padding` | PR #2531, single-purpose |
+| `fix/disposal-orphaned-clone` | orphaned-clone + hover-timeout fix, not yet submitted |
+| `test/signal-disposal-2469` | upstream PR #2469 applied for evaluation. Reviews say it does NOT fix our paths |
+
+⚠ **Building from a single feature branch silently drops every other patch.** On 2026-07-30 a build
+from `fix/disposal-orphaned-clone` (cut from master) removed the Status Group Padding feature
+entirely - the slider vanished from prefs after a relogin. The dconf value survived, so nothing was
+lost, but it looked like the feature had failed to persist. Keep PR branches single-purpose and
+merge them into `webdevbar-local` for daily use.
+
 ## What this fork carries
 
 `master` is upstream `master` plus:
