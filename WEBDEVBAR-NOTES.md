@@ -19,6 +19,16 @@ entirely - the slider vanished from prefs after a relogin. The dconf value survi
 lost, but it looked like the feature had failed to persist. Keep PR branches single-purpose and
 merge them into `webdevbar-local` for daily use.
 
+**Refresh it whenever a branch changes, then install from it:**
+
+```bash
+git checkout webdevbar-local
+git merge --no-ff --no-edit master feat/status-group-padding fix/disposal-orphaned-clone
+make install-local
+```
+
+Any new branch that is ready to use gets merged here too, in the same command. Relogin after.
+
 ## What this fork carries
 
 `master` is upstream `master` plus:
