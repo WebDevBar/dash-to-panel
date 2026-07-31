@@ -102,7 +102,7 @@ export const NotificationsMonitor = class extends EventEmitter {
       trayCount: 0, // MessageTray
       trayUrgent: false, // MessageTray
       urgent: false, // Unity add MessageTray combined
-      total: 0, // Unity add MessageTray combined
+      total: 0, // Unity and MessageTray combined
     }
   }
 
@@ -125,9 +125,16 @@ export const NotificationsMonitor = class extends EventEmitter {
       (this._state[appId].trayUrgent && this._state[appId].trayCount) ||
       false
 
-    this._state[appId].total =
-      ((this._state[appId]['count-visible'] || 0) &&
-        (this._state[appId].count || 0)) + (this._state[appId].trayCount || 0)
+    // The two sources are competing estimates of the same quantity, not
+    // separate quantities, so take the larger rather than adding them. An app
+    // that publishes a LauncherEntry count AND raises notifications otherwise
+    // has both counted, e.g. one new mail reads as 2. Where only one source is
+    // in use the other is 0 and max() and + agree.
+    this._state[appId].total = Math.max(
+      (this._state[appId]['count-visible'] || 0) &&
+        (this._state[appId].count || 0),
+      this._state[appId].trayCount || 0,
+    )
 
     return currenState != JSON.stringify(this._state[appId])
   }
