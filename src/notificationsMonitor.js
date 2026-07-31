@@ -125,16 +125,18 @@ export const NotificationsMonitor = class extends EventEmitter {
       (this._state[appId].trayUrgent && this._state[appId].trayCount) ||
       false
 
-    // The two sources are competing estimates of the same quantity, not
-    // separate quantities, so take the larger rather than adding them. An app
-    // that publishes a LauncherEntry count AND raises notifications otherwise
-    // has both counted, e.g. one new mail reads as 2. Where only one source is
-    // in use the other is 0 and max() and + agree.
-    this._state[appId].total = Math.max(
+    // An app that publishes its own count through LauncherEntry is
+    // authoritative about how much is unread, so that count wins outright
+    // rather than being added to the tray count. Apps doing both otherwise
+    // have every item counted twice: one new message reads as 2. Falling back
+    // to the tray count when the app publishes nothing keeps the old result
+    // for every app that uses only one of the two. Same precedence as
+    // dash-to-dock's applicationCounterOverridesNotifications.
+    let unityCount =
       (this._state[appId]['count-visible'] || 0) &&
-        (this._state[appId].count || 0),
-      this._state[appId].trayCount || 0,
-    )
+      (this._state[appId].count || 0)
+
+    this._state[appId].total = unityCount || this._state[appId].trayCount || 0
 
     return currenState != JSON.stringify(this._state[appId])
   }
