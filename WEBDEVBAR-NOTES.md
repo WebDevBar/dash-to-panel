@@ -90,7 +90,7 @@ pre-existing unread total never comes back.
 - `trayCount` comes from MessageTray banners with **no decrement signal**. Persisting it would
   produce a badge that can never clear, which is a worse bug than the one being fixed.
 
-## The badge double-count (fixed 2026-07-31)
+## The badge double-count (fixed 2026-07-31) - upstream issue #2515
 
 `_mergeState()` computed the badge as
 `((count-visible || 0) && (count || 0)) + (trayCount || 0)` - the Unity LauncherEntry count PLUS
@@ -98,24 +98,35 @@ the MessageTray count.
 
 Mailspring drives **both** channels: it publishes a LauncherEntry count over DBus, and it is
 registered for GNOME notifications (`application-children`, `enable=true`, `show-banners=true`), so
-each banner raises `source.count` too. One new mail therefore showed **2** on the badge while
-Mailspring's own unread counter showed 1. Twenty unread plus one banner would show 21.
+each banner raises `source.count` too. One new mail therefore showed **2** while Mailspring's own
+unread counter showed 1.
 
-They are competing estimates of the same quantity, not separate quantities, so the fix is
-`Math.max()`. Checked against every state the monitor can hold: only the two both-channel cases
-change, and both were wrong before.
+**Already reported upstream as
+[#2515](https://github.com/home-sweet-gnome/dash-to-panel/issues/2515)** (2026-06-23, open, no
+comments), found independently via Telegram and Discord, pointing at the same lines.
 
-| State | old | new |
-|---|---|---|
-| LauncherEntry only, 5 | 5 | 5 |
-| banners only, 3 | 3 | 3 |
-| both, one new mail | **2** | **1** |
-| 20 unread + 1 banner | **21** | **20** |
-| all read, 3 banners pending | 3 | 3 |
-| count hidden but count set | 2 | 2 |
+**The fix is precedence, not `Math.max()`.** The first attempt here took the larger of the two. The
+issue author instead proposed what dash-to-dock does, and reading dash-to-dock's
+`_updateNotificationsCount()` confirms it: when the LauncherEntry count is non-zero it uses **only**
+that. An app publishing its own count is authoritative about how much is unread, while banners can
+be stale or several for one item. It also makes the PR easy to review, since it matches the most
+widely deployed dock.
 
-That equivalence when only one channel is in use is why this was never reported: it needs an app
-driving both.
+The two only disagree when the app's count is lower than the banner count:
+
+| State | old sum | max | precedence |
+|---|---|---|---|
+| LauncherEntry only, 5 | 5 | 5 | 5 |
+| banners only, 3 | 3 | 3 | 3 |
+| both, one new message | **2** | 1 | 1 |
+| 20 unread + 1 banner | **21** | 20 | 20 |
+| 1 unread + 3 banners | **4** | **3** | 1 |
+| all read, 3 banners pending | 3 | 3 | 3 |
+
+Apps using a single channel are unaffected, which is why this survived so long.
+
+dash-to-dock keeps it behind `applicationCounterOverridesNotifications`, default on. Not adding a
+setting here: adding the two numbers is never meaningful, so there is nothing to opt into.
 
 ## ⚠ THE TRAP THAT COST AN AFTERNOON - GNOME caches extension modules
 
