@@ -11,6 +11,7 @@ Started 2026-07-30 on Fedora 44 / GNOME Shell 50.0 (Wayland).
 | `master` | upstream master + #2493 + our hoist + #2509 |
 | `feat/status-group-padding` | PR #2531, single-purpose |
 | `fix/disposal-orphaned-clone` | orphaned-clone + hover-timeout fix, not yet submitted |
+| `fix/badge-double-count` | badge took the SUM of the Unity and MessageTray counts, now the max. Not yet submitted |
 | `test/signal-disposal-2469` | upstream PR #2469 applied for evaluation. Reviews say it does NOT fix our paths |
 
 ⚠ **Building from a single feature branch silently drops every other patch.** On 2026-07-30 a build
@@ -88,6 +89,33 @@ pre-existing unread total never comes back.
   drives it back to zero.
 - `trayCount` comes from MessageTray banners with **no decrement signal**. Persisting it would
   produce a badge that can never clear, which is a worse bug than the one being fixed.
+
+## The badge double-count (fixed 2026-07-31)
+
+`_mergeState()` computed the badge as
+`((count-visible || 0) && (count || 0)) + (trayCount || 0)` - the Unity LauncherEntry count PLUS
+the MessageTray count.
+
+Mailspring drives **both** channels: it publishes a LauncherEntry count over DBus, and it is
+registered for GNOME notifications (`application-children`, `enable=true`, `show-banners=true`), so
+each banner raises `source.count` too. One new mail therefore showed **2** on the badge while
+Mailspring's own unread counter showed 1. Twenty unread plus one banner would show 21.
+
+They are competing estimates of the same quantity, not separate quantities, so the fix is
+`Math.max()`. Checked against every state the monitor can hold: only the two both-channel cases
+change, and both were wrong before.
+
+| State | old | new |
+|---|---|---|
+| LauncherEntry only, 5 | 5 | 5 |
+| banners only, 3 | 3 | 3 |
+| both, one new mail | **2** | **1** |
+| 20 unread + 1 banner | **21** | **20** |
+| all read, 3 banners pending | 3 | 3 |
+| count hidden but count set | 2 | 2 |
+
+That equivalence when only one channel is in use is why this was never reported: it needs an app
+driving both.
 
 ## ⚠ THE TRAP THAT COST AN AFTERNOON - GNOME caches extension modules
 
