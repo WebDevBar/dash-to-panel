@@ -3408,6 +3408,11 @@ const Preferences = class {
         range: DEFAULT_PADDING_SIZES,
       },
       {
+        objectName: 'statusgroupicon_padding_scale',
+        valueName: 'status-group-icon-padding',
+        range: DEFAULT_PADDING_SIZES,
+      },
+      {
         objectName: 'statusgroup_padding_scale',
         valueName: 'status-group-padding',
         range: DEFAULT_PADDING_SIZES,
