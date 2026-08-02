@@ -91,6 +91,13 @@ through there. Each window is resolved through
 `Shell.WindowTracker.get_default().get_window_app(w)` when `app` is null, and the
 resulting app id is tested against the set.
 
+**`get_window_app()` can return null**, and calling `get_id()` on that would throw
+during a split-app redisplay. The surrounding code already guards it - `if (app &&
+...)` at `src/taskbar.js:1169`. An unresolved window is **kept**, never filtered:
+it has no stable identity, so it can never have been added to the list, and
+discarding it would remove a window the user never excluded. This is the same
+limitation already stated under Identity, reached from the other direction.
+
 The set is parsed once and cached. **Invalidating the cache is not enough on its
 own** - it does not rebuild anything, so existing icons would linger until some
 unrelated app or window event triggered a redisplay. `changed::hide-from-panel-apps`
