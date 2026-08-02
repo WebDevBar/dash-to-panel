@@ -23,6 +23,7 @@
 - Never use the Edit tool on `.js`, `.xml` or `.ui` files — it silently converts straight quotes to curly ones and corrupts them.
 - **Every edit below is an anchored Python replace with `assert s.count(anchor) == 1`.** Unified diffs are the usual default, but line numbers shift as these tasks apply in sequence, so a diff written now would not apply cleanly by Task 4. The assert is what makes a failed match loud instead of a silent no-op — never remove it.
 - The setting key is `hide-from-panel-apps` everywhere. Never `hidden-apps` or `hide-apps`.
+- `Adw.AlertDialog` requires **libadwaita 1.5**, which is exactly what GNOME 46 ships — the floor in `metadata.json` (`shell-version: 46-50`). It is available across the whole supported range, but only just, so do not lower that floor without replacing the dialog.
 - All user-facing strings must be wrapped in `_()` in `.js` and marked `translatable="yes"` in `.ui`.
 - Requires a **full GNOME relogin** to test any `src/*.js` change — GNOME caches extension ES modules for the life of the shell process. Editing and re-enabling the extension is NOT sufficient and will show stale behaviour.
 
