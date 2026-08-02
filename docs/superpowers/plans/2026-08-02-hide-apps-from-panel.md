@@ -13,6 +13,10 @@
 ## Global Constraints
 
 <!-- claims-audit: creates /tmp/add-key.py /tmp/hidden-check.js /tmp/pr-body.md -->
+<!-- claims-audit: ignore Adw.AlertDialog Adw.ActionRow Adw.ComboRow Adw.ResponseAppearance Gtk.SignalListItemFactory Gtk.ClosureExpression GioUnix.DesktopAppInfo should_show() -->
+<!-- GTK4/Adwaita/Gio API, not repo symbols. All verified against the installed
+     introspection on 2026-08-02; AlertDialog additionally confirmed as
+     libadwaita 1.5, which is GNOME 46's version and this extension's floor. -->
 <!-- Scratch files the plan tells the engineer to write. Deliverables of their
      own steps, not citations of anything expected to exist beforehand. -->
 
