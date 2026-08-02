@@ -98,12 +98,23 @@ it has no stable identity, so it can never have been added to the list, and
 discarding it would remove a window the user never excluded. This is the same
 limitation already stated under Identity, reached from the other direction.
 
-The set is parsed once and cached. **Invalidating the cache is not enough on its
-own** - it does not rebuild anything, so existing icons would linger until some
-unrelated app or window event triggered a redisplay. `changed::hide-from-panel-apps`
-must therefore both invalidate the cache and queue a redisplay on every panel,
-alongside the existing `changed::` handlers in `src/taskbar.js` (see the block at
-lines 388-411, which already pairs setting changes with `_queueRedisplay`).
+The set is parsed once and cached, because parsing JSON inside a filter that runs on
+every taskbar update would be wasteful.
+
+**The cache is keyed on the raw setting string, not invalidated by a signal.** Each
+lookup compares the current raw value against the one the cache was built from and
+reparses only when they differ. This matters because a module-level cache outlives
+the extension: GNOME Shell keeps imported modules for the life of the shell process,
+while `Taskbar.destroy()` disconnects the setting handlers. A list edited while the
+extension is disabled would otherwise leave every re-enabled taskbar reading a stale
+set indefinitely, with no event that could ever correct it. Keying on the value makes
+that state unrepresentable rather than merely unlikely.
+
+A signal is still needed, but only to **redraw**: invalidation alone rebuilds
+nothing, so icons would linger until some unrelated app or window event.
+`changed::hide-from-panel-apps` queues a redisplay on every panel, alongside the
+existing `changed::` handlers in `src/taskbar.js` (the block at lines 388-411 already
+pairs setting changes with `_queueRedisplay`).
 
 ## Preferences UI
 
@@ -185,6 +196,9 @@ added twice.
      exception. Without this step the uninstalled-app path in Error handling is
      asserted but never exercised.
 - The panel must not need a relogin for a list change to take effect.
+- Disable Dash to Panel, change the list, re-enable it. The new list must apply
+  immediately. This is the stale-cache path: the module survives the disable, and
+  the setting handler does not.
 
 ## Out of scope
 
