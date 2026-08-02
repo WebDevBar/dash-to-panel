@@ -290,11 +290,25 @@ Insert as the last `<child>` of the final `AdwPreferencesGroup`'s parent page, m
 
 - [ ] **Step 2: Verify the .ui file still parses**
 
+`gtk4-builder-tool` is NOT installed on this machine - it ships in `gtk4-devel`.
+Either install it, which is the stronger check because it resolves widget classes
+and properties:
+
 ```bash
+sudo dnf install -y gtk4-devel
 gtk4-builder-tool validate ui/SettingsFineTune.ui
 ```
 
-Expected: no output, exit 0.
+or fall back to well-formedness only, which needs no sudo but will NOT catch a
+misspelled property or a class that does not exist:
+
+```bash
+xmllint --noout ui/SettingsFineTune.ui
+```
+
+Expected either way: no output, exit 0. If you take the fallback, note that Step 5's
+lint does not cover `.ui` files either, so the first real check of this markup is
+opening Preferences in Task 5.
 
 - [ ] **Step 3: Add the prefs logic**
 
