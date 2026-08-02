@@ -165,7 +165,11 @@ added twice.
 - A stored id whose application has since been uninstalled stays in the setting and
   is shown with a fallback icon and its raw id, so the user can see and remove it
   rather than finding a blank row.
-- An empty list is the default and costs one `length` check on the filter path.
+- An empty list is the default. It still costs what every lookup costs - a
+  `get_string()`, a comparison against the cached raw value, then a `length` check -
+  because the raw-value comparison is what keeps the cache honest across a
+  disable/enable cycle. That is the price of correctness under module caching, and
+  it is three cheap operations against a filter that already walks every window.
 
 ## Testing
 
