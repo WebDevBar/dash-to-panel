@@ -127,12 +127,22 @@ the single fact the row exists to show.
 `Gio.AppInfo.get_all()` filtered through `should_show()`, so it offers what the app
 grid offers.
 
+`enable-search` is not sufficient on its own. The model holds application objects,
+not strings, so the row has no idea what text to match against and search would do
+nothing. **`Adw.ComboRow:expression` must also be set**, returning each app's
+display name - that is what supplies the search key. Both properties are present on
+libadwaita 1 here, confirmed against the installed introspection.
+
 **Every entry in that picker shows the app's icon beside its name**, and so does
 the selected value. Names alone are ambiguous - several installed apps can read
 "Emoji Picker", and flatpak ids are not shown to the user - so the icon is what
 confirms at a glance that the right app was picked. Implemented with a
 `Gtk.SignalListItemFactory` binding a `Gtk.Image` from the app's `GIcon` plus a
-`Gtk.Label`, applied to both the list and the selected-item display.
+`Gtk.Label`.
+
+One factory is enough. `Adw.ComboRow:factory` renders the selected value **and**
+the popup entries; `list-factory` exists to override the popup separately and is
+deliberately left unset, so the two can never drift apart.
 
 Apps already on the list are omitted from the picker, so the same app cannot be
 added twice.
@@ -168,6 +178,12 @@ added twice.
      the call, so the exclusion should follow the same idiom rather than invent one.
   4. Confirm the picker shows icons, that search filters by name, and that an
      app already added is absent from the picker.
+  6. Hand-edit the setting to contain a desktop id that is not installed, e.g.
+     `gsettings set org.gnome.shell.extensions.dash-to-panel hide-from-panel-apps
+     '["does.not.exist.desktop"]'`, then reopen preferences. The row must appear
+     with a fallback icon and the raw id, and must be removable without an
+     exception. Without this step the uninstalled-app path in Error handling is
+     asserted but never exercised.
 - The panel must not need a relogin for a list change to take effect.
 
 ## Out of scope
