@@ -84,8 +84,19 @@ of list handling into the same prefs file.
 `w.skip_taskbar`. The exclusion sits beside it and is keyed on the **app**, not the
 window - which is what lets the pinned launcher survive while its windows vanish.
 
-The set is parsed once and cached, invalidated on a settings change. Parsing JSON
-inside a window filter that runs on every taskbar update would be wasteful.
+**The `app` argument can be null**, and that path must be handled or the feature
+silently fails. `src/taskbar.js:1182` calls `getInterestingWindows(null, ...)`, so
+an exclusion that reads `app.get_id()` alone would let excluded windows straight
+through there. Each window is resolved through
+`Shell.WindowTracker.get_default().get_window_app(w)` when `app` is null, and the
+resulting app id is tested against the set.
+
+The set is parsed once and cached. **Invalidating the cache is not enough on its
+own** - it does not rebuild anything, so existing icons would linger until some
+unrelated app or window event triggered a redisplay. `changed::hide-from-panel-apps`
+must therefore both invalidate the cache and queue a redisplay on every panel,
+alongside the existing `changed::` handlers in `src/taskbar.js` (see the block at
+lines 388-411, which already pairs setting changes with `_queueRedisplay`).
 
 ## Preferences UI
 
@@ -137,8 +148,17 @@ added twice.
      auto-paste must still work.
   2. Pin Smile as a favourite. The launcher appears; opening it adds no running
      indicator and no second icon.
-  3. Remove Smile from the list. Its window reappears in the panel without a
-     shell restart.
+  3. Remove Smile from the list **while it is open**. Its icon reappears without a
+     shell restart and without touching another window - this is what proves the
+     redisplay is queued rather than merely the cache cleared.
+  5. Repeat step 1 in split-app mode, the only path calling
+     `getInterestingWindows(null, ...)`. `allowSplitApps` is
+     `usingLaunchers || (!isGroupApps && !showFavorites)` (`src/taskbar.js:434`),
+     where `usingLaunchers` is `!isGroupApps && group-apps-use-launchers`
+     (`src/taskbar.js:427`) - so turn `group-apps` **off**, then either turn
+     `group-apps-use-launchers` **on** or `show-favorites` **off**. That path
+     already resolves windows with `tracker.get_window_app(w)` a few lines below
+     the call, so the exclusion should follow the same idiom rather than invent one.
   4. Confirm the picker shows icons, that search filters by name, and that an
      app already added is absent from the picker.
 - The panel must not need a relogin for a list change to take effect.
