@@ -12,11 +12,16 @@
 
 ## Global Constraints
 
+<!-- claims-audit: creates /tmp/add-key.py /tmp/hidden-check.js /tmp/pr-body.md -->
+<!-- Scratch files the plan tells the engineer to write. Deliverables of their
+     own steps, not citations of anything expected to exist beforehand. -->
+
 - Branch from `upstream/master` (`1c0c1f1`), **code only**. Do not include `docs/` in this branch; the spec and this plan live on `webdevbar-local`.
 - Target branch name: `feat/hide-apps-from-panel`.
 - No unit-test framework exists in this repo. `npm run lint` (prettier + eslint) is the only automated gate; correctness is proven by the manual GNOME steps in Task 5.
 - K&R braces, no semicolons, single quotes — enforced by prettier, so run the linter rather than hand-formatting.
-- Never use the Edit tool on `.js`, `.xml` or `.ui` files. Write a unified diff and apply it with `git apply --check` then `git apply`.
+- Never use the Edit tool on `.js`, `.xml` or `.ui` files — it silently converts straight quotes to curly ones and corrupts them.
+- **Every edit below is an anchored Python replace with `assert s.count(anchor) == 1`.** Unified diffs are the usual default, but line numbers shift as these tasks apply in sequence, so a diff written now would not apply cleanly by Task 4. The assert is what makes a failed match loud instead of a silent no-op — never remove it.
 - The setting key is `hide-from-panel-apps` everywhere. Never `hidden-apps` or `hide-apps`.
 - All user-facing strings must be wrapped in `_()` in `.js` and marked `translatable="yes"` in `.ui`.
 - Requires a **full GNOME relogin** to test any `src/*.js` change — GNOME caches extension ES modules for the life of the shell process. Editing and re-enabling the extension is NOT sufficient and will show stale behaviour.
@@ -53,7 +58,7 @@ git checkout -b feat/hide-apps-from-panel upstream/master
 
 - [ ] **Step 2: Add the key**
 
-Write the patch to a file and apply it. Insert immediately after the closing `</key>` of `context-menu-entries`:
+Insert immediately after the closing `</key>` of `context-menu-entries`:
 
 ```xml
     <key type="s" name="hide-from-panel-apps">
@@ -63,8 +68,27 @@ Write the patch to a file and apply it. Insert immediately after the closing `</
     </key>
 ```
 
-```bash
-git apply --check /tmp/hide-apps-schema.patch && git apply /tmp/hide-apps-schema.patch
+Save this as `/tmp/add-key.py` and run `python3 /tmp/add-key.py`. Write it with a
+file-writing tool, not a shell heredoc — the script contains its own quoting and a
+nested heredoc would terminate early.
+
+```python
+import io
+
+p = 'schemas/org.gnome.shell.extensions.dash-to-panel.gschema.xml'
+s = io.open(p, encoding='utf-8').read()
+
+anchor = '      <summary>User defined context menu entries</summary>\n    </key>\n'
+key = '''    <key type="s" name="hide-from-panel-apps">
+      <default>'[]'</default>
+      <summary>Apps whose windows never appear in the panel</summary>
+      <description>JSON array of desktop file ids. Windows belonging to these apps are not shown in the taskbar. A pinned favourite for such an app still appears and still launches.</description>
+    </key>
+'''
+
+assert s.count(anchor) == 1, s.count(anchor)
+io.open(p, 'w', encoding='utf-8').write(s.replace(anchor, anchor + key))
+print('key added')
 ```
 
 - [ ] **Step 3: Verify the schema compiles**
@@ -166,7 +190,12 @@ Expected: exits 0, and `git diff` shows only your change plus any prettier refor
 
 - [ ] **Step 4: Verify the helper's logic without GNOME**
 
-The repo has no test runner, so exercise the pure logic directly:
+**This is a logic rehearsal, NOT a test of the code you just wrote.** The repo has
+no test runner, and `isHiddenFromPanel` cannot be imported outside GNOME because
+`src/appIcons.js` imports `gi://` modules. The script below re-states the caching
+logic to prove the ALGORITHM is right; it cannot catch a transcription error in
+the file. Step 4b covers syntax, and Task 5 is what actually exercises the shipped
+code — do not treat a green run here as verification:
 
 ```bash
 cat > /tmp/hidden-check.js <<'EOF'
@@ -190,6 +219,15 @@ node /tmp/hidden-check.js
 ```
 
 Expected: six lines, all `true`.
+
+- [ ] **Step 4b: Syntax-check the file you actually edited**
+
+```bash
+node --check src/appIcons.js
+```
+
+Expected: no output, exit 0. This is what catches a mistyped ternary or an unbalanced
+paren in Step 2. It does not run the code — nothing outside GNOME can.
 
 - [ ] **Step 5: Commit**
 
@@ -489,6 +527,19 @@ make install     # or: cp -r src schemas ui metadata.json ~/.local/share/gnome-s
 
 Then log out and back in.
 
+**Prerequisite.** The steps below use Smile as the app to hide. It is not part of this
+repository. Either install it:
+
+```bash
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user -y flathub it.mijorus.smile
+```
+
+and bind `Super+.` to `flatpak run it.mijorus.smile` in Settings → Keyboard → Custom
+Shortcuts, or substitute **any** installed app you can open and close freely — a text
+editor works. Only steps 1 and 5 care that it opens quickly; nothing depends on Smile
+specifically.
+
 - [ ] **Step 1: Basic exclusion**
 
 Open Preferences → Fine-Tune → Hide apps from the panel → `+`. Confirm the picker shows an **icon beside every app name**, that typing filters the list, and add Smile.
@@ -531,6 +582,45 @@ Expected: a row appears showing the raw id, a fallback icon, and "Not installed"
 
 - [ ] **Step 8: Restore your own settings and open the PR**
 
+Write the PR body first — `gh pr create` fails if the file does not exist:
+
+```bash
+cat > /tmp/pr-body.md <<'EOF'
+Some windows have no business occupying a taskbar slot - an emoji picker summoned
+with a shortcut, used for two seconds, then dismissed. On Wayland the application
+cannot say so itself: `MetaWindow.skip-taskbar` is read-only (`flags: 225,
+writable: False` on Mutter 18) and xdg-shell carries no client request for it. The
+panel is the only place left to solve it.
+
+This adds a `hide-from-panel-apps` setting - a JSON array of desktop file ids - and
+a list in the Fine-Tune tab to manage it, with a searchable app picker showing each
+app's icon.
+
+A pinned favourite for an excluded app deliberately still appears and still
+launches; only the running-window icon is suppressed. Pinning is a statement about
+the launcher, excluding is a statement about running windows, and filtering the pin
+away too would look like the pin had failed.
+
+Alt-Tab is out of scope - it reads the same read-only property and is a different
+component.
+
+Notes:
+- `getInterestingWindows()` is called with `app === null` on the split-app path, so
+  windows are resolved individually via `get_window_app()`, which can itself return
+  null. Unresolved windows are kept, never filtered.
+- The parsed set is cached against the raw setting string rather than invalidated by
+  a signal, because a module-level cache outlives the extension across
+  disable/enable while `Taskbar.destroy()` disconnects the handlers.
+
+Tested manually on GNOME Shell <VERSION> / Wayland with panels on two monitors:
+basic exclusion, pinned favourite unaffected, live removal, no duplicates in the
+picker, the split-app path, disable-edit-re-enable, and an uninstalled desktop id.
+There is no automated test suite in this repository.
+EOF
+```
+
+Replace `<VERSION>` with the output of `gnome-shell --version`. Then:
+
 ```bash
 gsettings --schemadir schemas/ set org.gnome.shell.extensions.dash-to-panel hide-from-panel-apps '[]'
 git push -u origin feat/hide-apps-from-panel
@@ -539,7 +629,6 @@ gh pr create --repo home-sweet-gnome/dash-to-panel --base master \
   --title "feat: hide chosen apps from the panel" --body-file /tmp/pr-body.md
 ```
 
-The PR body must state the motivation (`MetaWindow.skip-taskbar` is read-only, verified `flags: 225, writable: False` on Mutter 18, and xdg-shell has no client request for it, so the panel is the only place this can be solved), that pinned favourites are deliberately unaffected, and that Alt-Tab is out of scope. Do not claim a test suite passed — say which manual steps were run, on which shell version.
 
 - [ ] **Step 9: Merge into the integration branch**
 
